@@ -120,3 +120,41 @@ multi
 coef_test(multi, vcov = "CR2")
 ```
 
+## Network meta-analysis  
+
+```{r}
+new_row <- pain_score %>% 
+  filter(id == 6) %>% 
+  summarize_all(funs(mean(., na.rm=TRUE)))
+new_row[2] <- "Cheok, 2011"
+
+pain_score_nm <- pain_score %>% 
+  slice(-6, -7) %>% 
+  rbind(new_row)
+nm_pain <- netmeta(TE = TE,
+                   seTE = seTE,
+                   treat1 = treat1,
+                   treat2 = treat2,
+                   #studlab = id,
+                   data = pain_score_nm,
+                   sm = "SMD")
+nm_pain
+```
+
+## Network graph  
+
+```{r}
+netgraph(nm_pain)
+```
+```{r}
+netgraph(nm_pain,
+         start = "random",
+         iterate = TRUE,
+         col = "darkgray",
+         cex = 1.5,
+         multiarm = FALSE,
+         points = TRUE,
+         col.points = "blue",
+         cex.points = 3)
+```
+
