@@ -1,0 +1,122 @@
+---
+output: 
+    stevetemplates::statement:
+    latex_engine: pdflatex
+geometry: margin=1in
+
+title: "Dr. Hayashi Project"
+author: Akihiro Shiroshita
+affiliation: Department of Respiratory Medicine, Ichinomiyanishi Hospital
+email: "akihirokun8@gmail.com"
+
+fontfamily: cochineal
+fontsize: 11pt
+---
+
+# Setting-up  
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+packages = c("devtools",
+             "usethis",
+             "here",
+             "readr",
+             "data.table",
+             "readxl",
+             "tidyverse",
+             "tidylog",
+             "lubridate",
+             "ggplot2",
+             "ggthemes",
+             "rlang",
+             "metafor",
+             "metaforest",
+             "clubSandwich",
+             "netmeta",
+             "dmetar",
+             "rgl",
+             "gemtc",
+             "igraph",
+             "dmetar")
+package.check <- lapply(packages, FUN = function(x){
+  if (!require(x, character.only = TRUE)){
+    install.packages(x, dependencies = TRUE)
+    library(x, character.only = TRUE)
+  }
+})
+
+#immediate_success <- read_csv(here("input", "immediate_success.csv"), 
+#    locale = locale(encoding = "SHIFT-JIS"))
+#length_of_hospital_stay <- read_csv(here("input", "length_of_stay.csv"), 
+#    locale = locale(encoding = "SHIFT-JIS"))
+#patient_satisfaction <- read_csv(here("input","patient_satisfaction.csv"), 
+#    locale = locale(encoding = "SHIFT-JIS"))
+pain_score <- read_csv(here("input", "pain_score.csv"),
+                       locale = locale(encoding = "SHIFT-JIS"))
+```
+
+# Pain score  
+
+```{r}
+pain_score
+```
+
+## Calculating standardized mean difference    
+
+```{r}
+com <- metacont(ne[1], me[1], se[1],
+         nc[1], mc[1], sc[1],
+         data = pain_score,
+         sm = "SMD")
+com$TE
+com$seTE
+```
+## Loop for calculation  
+
+```{r}
+pain_score <- pain_score %>% 
+  mutate(treat_id = row_number())
+
+# TE
+
+pain_score <- pain_score %>% 
+  mutate(TE = map_dbl(1:length(treat_id), ~{
+  com <- metacont(ne[[.]], me[[.]], se[[.]], nc[[.]], mc[[.]], sc[[.]],
+                  sm = "SMD")
+  TE <- com$TE
+  return(TE)
+}))
+
+# SE
+
+pain_score <- pain_score %>% 
+  mutate(seTE = map_dbl(1:length(treat_id), ~{
+  com <- metacont(ne[[.]], me[[.]], se[[.]], nc[[.]], mc[[.]], sc[[.]],
+                  sm = "SMD")
+  seTE <- com$seTE
+  return(seTE)
+}))
+
+```
+```{r}
+pain_score
+```
+  
+## Fitting multilevel model  
+
+```{r}
+
+pain_score_sub <- pain_score %>% 
+  slice(-9, -10, -11)
+multi <- rma.mv(TE, seTE,
+                random = list(~ 1 | treat_id,
+                              ~ 1 | id),
+                data = pain_score_sub)
+multi
+```
+
+## Robust standard error  
+
+```{r}
+coef_test(multi, vcov = "CR2")
+```
+
