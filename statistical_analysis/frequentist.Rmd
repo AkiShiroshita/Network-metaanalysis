@@ -44,8 +44,8 @@ package.check <- lapply(packages, FUN = function(x){
   }
 })
 
-#immediate_success <- read_csv(here("input", "immediate_success.csv"), 
-#    locale = locale(encoding = "SHIFT-JIS"))
+immediate_success <- read_csv(here("input", "immediate_success_rate.csv"), 
+    locale = locale(encoding = "SHIFT-JIS"))
 #length_of_hospital_stay <- read_csv(here("input", "length_of_stay.csv"), 
 #    locale = locale(encoding = "SHIFT-JIS"))
 #patient_satisfaction <- read_csv(here("input","patient_satisfaction.csv"), 
@@ -158,3 +158,143 @@ netgraph(nm_pain,
          cex.points = 3)
 ```
 
+
+# Immediate success rate  
+
+```{r}
+immediate_success
+```
+
+## Calculating odds ratio    
+
+```{r}
+odds <- metabin(ee[2], ne[2], ec[2], nc[2],
+                sm = "OR",
+                method = "I",
+                data = immediate_success)
+odds$TE
+odds$seTE
+```
+## Loop for calculation  
+
+```{r}
+immediate_success <- immediate_success %>% 
+  mutate(treat_id = row_number())
+
+# TE
+
+immediate_success <- immediate_success %>% 
+  mutate(TE_odds = map_dbl(1:length(treat_id), ~{
+  odds <- metabin(ee[.], ne[.], ec[.], nc[.],
+                sm = "OR",
+                method = "I")
+  TE_odds <- odds$TE
+  return(TE_odds)
+}))
+
+# SE
+
+immediate_success <- immediate_success %>% 
+  mutate(seTE_odds = map_dbl(1:length(treat_id), ~{
+  odds <- metabin(ee[.], ne[.], ec[.], nc[.],
+                sm = "OR",
+                method = "I",
+                data = immediate_success)
+  seTE_odds <- odds$seTE
+  return(seTE_odds)
+}))
+
+```
+## calculating risk ratio and risk difference  
+
+```{r}
+# TE
+
+immediate_success <- immediate_success %>% 
+  mutate(TE_rr = map_dbl(1:length(treat_id), ~{
+  rr <- metabin(ee[.], ne[.], ec[.], nc[.],
+                sm = "RR",
+                method = "I")
+  TE_rr <- rr$TE
+  return(TE_rr)
+}))
+
+# SE
+
+immediate_success <- immediate_success %>% 
+  mutate(seTE_rr = map_dbl(1:length(treat_id), ~{
+  rr <- metabin(ee[.], ne[.], ec[.], nc[.],
+                sm = "RR",
+                method = "I",
+                data = immediate_success)
+  seTE_rr <- rr$seTE
+  return(seTE_rr)
+}))
+
+# TE
+
+immediate_success <- immediate_success %>% 
+  mutate(TE_rd = map_dbl(1:length(treat_id), ~{
+  rd <- metabin(ee[.], ne[.], ec[.], nc[.],
+                sm = "RD",
+                method = "I")
+  TE_rd <- rd$TE
+  return(TE_rd)
+}))
+
+# SE
+
+immediate_success <- immediate_success %>% 
+  mutate(seTE_rd = map_dbl(1:length(treat_id), ~{
+  rd <- metabin(ee[.], ne[.], ec[.], nc[.],
+                sm = "OR",
+                method = "I",
+                data = immediate_success)
+  seTE_rd <- rd$seTE
+  return(seTE_rd)
+}))
+
+```
+
+## Checking dataset  
+```{r}
+immediate_success
+```
+
+## Network meta-analysis  
+### Odds ratio  
+```{r}
+nm_immediate_success <- netmeta(TE = TE_odds,
+                   seTE = seTE_odds,
+                   treat1 = treat1,
+                   treat2 = treat2,
+                   #studlab = id,
+                   data = immediate_success,
+                   sm = "OR")
+nm_immediate_success
+```
+## Risk ratio  
+
+```{r}
+nm_immediate_success <- netmeta(TE = TE_odds,
+                   seTE = seTE_odds,
+                   treat1 = treat1,
+                   treat2 = treat2,
+                   #studlab = id,
+                   data = immediate_success,
+                   sm = "RR")
+nm_immediate_success
+```
+
+## Risk difference  
+
+```{r}
+nm_immediate_success <- netmeta(TE = TE_odds,
+                   seTE = seTE_odds,
+                   treat1 = treat1,
+                   treat2 = treat2,
+                   #studlab = id,
+                   data = immediate_success,
+                   sm = "RD")
+nm_immediate_success
+```
